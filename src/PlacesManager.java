@@ -1,6 +1,8 @@
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
+import java.net.MulticastSocket;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -11,6 +13,9 @@ import java.util.ArrayList;
 public class PlacesManager extends UnicastRemoteObject implements PlacesListInterface,MonitoringInterface {
     private static final long serialVersionUID = 1L;
     ArrayList <Place> places;
+    static Thread t;
+    final static String INET_ADDR = "224.0.0.3";
+    final static int PORT = 7555;
 
     public PlacesManager() throws RemoteException {
         super();
@@ -18,13 +23,46 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         this.places=new ArrayList <Place>();
     }
 
-    public PlacesManager(int port) throws RemoteException{
+    public void receiveUDPMessage(String ip, int port) throws
+            IOException {
+        byte[] buffer=new byte[1024];
+        MulticastSocket socket=new MulticastSocket(port);
+        InetAddress group=InetAddress.getByName(ip);
+        socket.joinGroup(group);
+        while(true){
+            System.out.println("Waiting for multicast message...");
+            DatagramPacket packet=new DatagramPacket(buffer,
+                    buffer.length);
+            socket.receive(packet);
+            String msg=new String(packet.getData(),
+                    packet.getOffset(),packet.getLength());
+            System.out.println("[Multicast UDP message received]>> "+msg);
+            if("OK".equals(msg)) {
+                System.out.println("No more message. Exiting : "+msg);
+                break;
+            }
+        }
+        socket.leaveGroup(group);
+        socket.close();
+    }
+
+
+    public PlacesManager(int port) throws IOException {
         super();
         this.places=new ArrayList <Place>();
-        ReplicasManagementInterface replicasManagementInterface=null;
         PlacesListInterface placesListInterface=null;
         String addr=null;
-        try {
+        t= (new Thread(){
+            public void run() {
+                try {
+                    receiveUDPMessage(INET_ADDR, PORT);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+        t.start();
+        /*try {
             replicasManagementInterface=(ReplicasManagementInterface)Naming.lookup("rmi://localhost:2024/replicamanager");
             addr=replicasManagementInterface.addReplica("rmi://localhost:"+port+"/placelist");
         } catch (NotBoundException e) {
@@ -41,7 +79,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                 e.printStackTrace();
             }
             places = placesListInterface.allPlaces();
-        }
+        }*/
     }
 
     public PlacesManager(ArrayList<Place> places) throws RemoteException {
