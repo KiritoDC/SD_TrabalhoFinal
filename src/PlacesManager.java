@@ -18,6 +18,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     static Thread t;
     final static String INET_ADDR = "224.0.0.3";
     final static int PORT = 7555;
+    int myport;
     static int portoServerLider;
 
     public PlacesManager() throws RemoteException {
@@ -41,13 +42,21 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             socket.receive(packet);
             String msg = new String(packet.getData(), packet.getOffset(), packet.getLength());
-            System.out.println("[Multicast UDP message received]>> "+msg);
-            if(!ListaManager.contains(Integer.parseInt(msg)))
-                ListaManager.add(Integer.parseInt(msg));
-            System.out.println("Portos conhecidos:" );
+            System.out.println("[Multicast UDP message received]>> "+String.valueOf(myport)+" "+msg);
+            String[] parts=msg.split(" ");
+            int porta=Integer.valueOf(parts[1]);
+            if(!ListaManager.contains(porta))
+                ListaManager.add(porta);
+            System.out.println("Portos conhecidos:"+String.valueOf(myport) );
             for(int i = 0; i < ListaManager.size(); i++){
                 System.out.println(ListaManager.get(i));
             }
+            if(parts[0].equals("Info"))
+                replyServers(myport);
+            //else
+                //replyServers(myport);
+            //todo sincronize list
+            //TODO
             if("OK".equals(msg)) {
                 System.out.println("No more message. Exiting : "+msg);
                 break;
@@ -60,6 +69,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
 
     public PlacesManager(int port) throws IOException, InterruptedException {
         super();
+        myport=port;
         this.places=new ArrayList <Place>();
         PlacesListInterface placesListInterface=null;
         String addr=null;
@@ -73,8 +83,6 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             }
         });
         t.start();
-        sleep(10000);
-        findServers(port);
         /*try {
             replicasManagementInterface=(ReplicasManagementInterface)Naming.lookup("rmi://localhost:2024/replicamanager");
             addr=replicasManagementInterface.addReplica("rmi://localhost:"+port+"/placelist");
@@ -99,7 +107,21 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
         InetAddress addr = InetAddress.getByName(INET_ADDR);
         try (DatagramSocket serverSocket = new DatagramSocket()){
-            String msg = String.valueOf(port);
+            String msg = "Info ".concat(String.valueOf(port));
+            DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
+            serverSocket.send(msgPacket);
+        } catch (SocketException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void replyServers(int port) throws UnknownHostException {
+        //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
+        InetAddress addr = InetAddress.getByName(INET_ADDR);
+        try (DatagramSocket serverSocket = new DatagramSocket()){
+            String msg = "Reply ".concat(String.valueOf(port));
             DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
             serverSocket.send(msgPacket);
         } catch (SocketException e) {
