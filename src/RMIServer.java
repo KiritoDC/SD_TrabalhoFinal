@@ -26,7 +26,7 @@ public class RMIServer {
             }
 
             System.out.println("Place server ready");
-            placeList.findServers(Integer.parseInt(args[0]));
+            //placeList.findServers(Integer.parseInt(args[0]));
         } catch (Exception e) {
             System.out.println("Place server main " + e.getMessage());
         }
