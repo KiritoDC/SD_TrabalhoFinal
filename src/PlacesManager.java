@@ -51,6 +51,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             }
         });
         t.start();
+        sleep(1000);
         p= (new Thread(){
             public void run() {
                 try {
@@ -78,15 +79,27 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             socket.receive(packet);
             String msg = new String(packet.getData(), packet.getOffset(), packet.getLength());
-            //System.out.println("[Multicast UDP message received]>> "+String.valueOf(myport)+" "+msg);
+            System.out.println("[Multicast UDP message received]>> "+String.valueOf(myport)+" "+msg);
             String[] parts=msg.split(" ");
             int porta=Integer.valueOf(parts[1]);
+            /*System.out.println("list manager rece antes");
+            for(int i = 0; i < ListaManager.size(); i++){
+                System.out.println(ListaManager.get(i)+" "+myport);
+            }
+            System.out.println("lista temp rec antes");
+            for(int i = 0; i < ListaManagertemp.size(); i++){
+                System.out.println(ListaManagertemp.get(i)+" "+myport);
+            }*/
             if(!ListaManagertemp.contains(porta)) {
                 ListaManagertemp.add(porta);
             }
-            //System.out.println("Portos conhecidos:"+String.valueOf(myport) );
-            /*for(int i = 0; i < ListaManager.size(); i++){
-                System.out.println(ListaManager.get(i));
+            /*System.out.println("list manager rece");
+            for(int i = 0; i < ListaManager.size(); i++){
+                System.out.println(ListaManager.get(i)+" "+myport);
+            }
+            System.out.println("lista temp rec");
+            for(int i = 0; i < ListaManagertemp.size(); i++){
+                System.out.println(ListaManagertemp.get(i)+" "+myport);
             }*/
             if(parts[0].equals("Info"))
                 replyServers(myport);
@@ -106,15 +119,20 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             Collections.sort(ListaManagertemp);
             System.out.println("list manager");
             for(int i = 0; i < ListaManager.size(); i++){
-                System.out.println(ListaManager.get(i));
+                System.out.println(ListaManager.get(i)+" "+myport);
             }
             System.out.println("lista temp");
             for(int i = 0; i < ListaManagertemp.size(); i++){
-                System.out.println(ListaManagertemp.get(i));
+                System.out.println(ListaManagertemp.get(i)+" "+myport);
             }
             if(!ListaManager.equals(ListaManagertemp)) {
                 electleader();
-                ListaManager = ListaManagertemp;
+                ListaManager.clear();
+                for(int i=0;i<ListaManagertemp.size();i++){
+                    ListaManager.add(ListaManagertemp.get(i));
+                }
+                //System.arraycopy(ListaManagertemp,0,ListaManager,0,ListaManagertemp.size());
+                //ListaManager = ListaManagertemp;
             }
             else {
                 System.out.println("Current Leader = "+myport+" " + leader);
@@ -126,7 +144,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             } catch (UnknownHostException e) {
                 e.printStackTrace();
             }
-            sleep(30000);
+            sleep(20000);
         }
     }
 
