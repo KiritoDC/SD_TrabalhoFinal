@@ -1,3 +1,4 @@
+package A;
 import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.net.*;
@@ -18,12 +19,14 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     ArrayList <Place> places;
     static Thread t;
     static Thread p;
+    static Thread y;
     final static String INET_ADDR = "224.0.0.3";
     final static int PORT = 7555;
     int myport;
     int leader;
     int leadertemp;
     static int portoServerLider;
+    boolean estado=true;
 
     public PlacesManager() throws RemoteException {
         super();
@@ -61,6 +64,10 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             }
         });
         p.start();
+        if(myport==2026) {
+            sleep(10000);
+            estado=false;
+        }
     }
 
     public void receiveUDPMessage(String ip, int port) throws
@@ -74,12 +81,12 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         InetAddress group = InetAddress.getByName(ip);
         socket.joinGroup(group);
         HashMap <Integer,Integer> mapleaders=new HashMap<Integer, Integer>();
-        while(true){
+        while(estado){
             //System.out.println("Waiting for multicast message...");
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             socket.receive(packet);
             String msg = new String(packet.getData(), packet.getOffset(), packet.getLength());
-            System.out.println("[Multicast UDP message received]>> "+String.valueOf(myport)+" "+msg);
+            //System.out.println("[Multicast UDP message received]>> "+String.valueOf(myport)+" "+msg);
             String[] parts=msg.split(" ");
             if(parts[0].equals("Info")) {
                 int porta = Integer.valueOf(parts[1]);
@@ -106,11 +113,13 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             else
                 if(parts[0].equals("leader")){
                     int a=0;
-                    if(mapleaders.containsKey(Integer.parseInt(parts[2]))){
-                        mapleaders.put(Integer.parseInt(parts[2]),mapleaders.get(Integer.parseInt(parts[2])+1));
+                    if(mapleaders.containsKey(Integer.parseInt(parts[1]))){
+                        int c=mapleaders.get(Integer.parseInt(parts[1]));
+                        c++;
+                        mapleaders.put(Integer.parseInt(parts[1]),c);
                     }
                     else{
-                        mapleaders.put(Integer.parseInt(parts[2]),1);
+                        mapleaders.put(Integer.parseInt(parts[1]),1);
                     }
                     int tamanho=0;
                     Iterator it=mapleaders.entrySet().iterator();
@@ -133,12 +142,12 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                             leader=-1;
                         }
                         a=0;
+                        mapleaders.clear();
                     }
-                    mapleaders.clear();
                 }
                 else if(parts[0].equals("defleader")) {
                     leader=Integer.parseInt(parts[1]);
-                    System.out.println("Lider definitivo " + leader);
+                    System.out.println(myport+"Lider definitivo " + leader);
                 }
             if("OK".equals(msg)) {
                 System.out.println("No more message. Exiting : "+msg);
@@ -150,7 +159,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     }
 
     public void keepalive() throws InterruptedException {
-        while(true){
+        while(estado){
             Collections.sort(ListaManager);
             Collections.sort(ListaManagertemp);
             System.out.println("list manager");
@@ -172,6 +181,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                 System.out.println("Current Leader = "+myport+" " + leader);
             }
             ListaManagertemp.clear();
+            ListaManagertemp.add(myport);
 
             try {
                 findServers(myport);
@@ -228,7 +238,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
         InetAddress addr = InetAddress.getByName(INET_ADDR);
         try (DatagramSocket serverSocket = new DatagramSocket()){
-            String msg = "leader ".concat(String.valueOf(leader)).concat(" ").concat(String.valueOf(myport));
+            String msg = "leader ".concat(String.valueOf(leadertemp)).concat(" ").concat(String.valueOf(myport));
             DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
             serverSocket.send(msgPacket);
         } catch (SocketException e) {
