@@ -23,7 +23,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     final static String INET_ADDR = "224.0.0.3";
     final static int PORT = 7555;
     int myport;
-    int leader;
+    int leader=-1;
     int leadertemp;
     static int portoServerLider;
     boolean estado=true;
@@ -43,6 +43,8 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         this.places=new ArrayList <Place>();
         PlacesListInterface placesListInterface=null;
         String addr=null;
+        ListaManager.add(myport);
+        ListaManagertemp.add(myport);
         t= (new Thread(){
             public void run() {
                 try {
@@ -149,6 +151,12 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                     leader=Integer.parseInt(parts[1]);
                     System.out.println(myport+"Lider definitivo " + leader);
                 }
+                else if(parts[0].equals("add")){
+                    Place place=new Place(parts[2],parts[1]);
+                    if(!places.contains(place) && leader!=myport){
+                        places.add(place);
+                    }
+                }
             if("OK".equals(msg)) {
                 System.out.println("No more message. Exiting : "+msg);
                 break;
@@ -177,7 +185,14 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                     ListaManager.add(ListaManagertemp.get(i));
                 }
             }
-            else {
+           else if(!ListaManager.contains(leader)){
+                electleader();
+                ListaManager.clear();
+                for(int i=0;i<ListaManagertemp.size();i++){
+                    ListaManager.add(ListaManagertemp.get(i));
+                }
+            }
+            else{
                 System.out.println("Current Leader = "+myport+" " + leader);
             }
             ListaManagertemp.clear();
@@ -248,6 +263,20 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         }
     }
 
+    public void sendaddmessage(Place p) throws UnknownHostException {
+        //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
+        InetAddress addr = InetAddress.getByName(INET_ADDR);
+        try (DatagramSocket serverSocket = new DatagramSocket()){
+            String msg = "add ".concat(p.getLocality()).concat(" ").concat(p.getPostalCode());
+            DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
+            serverSocket.send(msgPacket);
+        } catch (SocketException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public PlacesManager(ArrayList<Place> places) throws RemoteException {
         super();
         this.places = places;
@@ -256,6 +285,13 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     @Override
     public void addPlace(Place p) throws RemoteException {
         places.add(p);
+        if(leader==myport){
+            try {
+                sendaddmessage(p);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
