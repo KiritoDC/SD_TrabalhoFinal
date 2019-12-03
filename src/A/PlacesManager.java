@@ -1,11 +1,8 @@
 package A;
-import javax.xml.crypto.Data;
+
 import java.io.IOException;
 import java.net.*;
-import java.rmi.Naming;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 
@@ -90,8 +87,9 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             String msg = new String(packet.getData(), packet.getOffset(), packet.getLength());
             //System.out.println("[Multicast UDP message received]>> "+String.valueOf(myport)+" "+msg);
             String[] parts=msg.split(" ");
-            if(parts[0].equals("Info")) {
-                int porta = Integer.valueOf(parts[1]);
+            switch (parts[0]) {
+                case "Info":
+                    int porta = Integer.valueOf(parts[1]);
             /*System.out.println("list manager rece antes");
             for(int i = 0; i < ListaManager.size(); i++){
                 System.out.println(ListaManager.get(i)+" "+myport);
@@ -100,9 +98,9 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             for(int i = 0; i < ListaManagertemp.size(); i++){
                 System.out.println(ListaManagertemp.get(i)+" "+myport);
             }*/
-                if (!ListaManagertemp.contains(porta)) {
-                    ListaManagertemp.add(porta);
-                }
+                    if (!ListaManagertemp.contains(porta)) {
+                        ListaManagertemp.add(porta);
+                    }
             /*System.out.println("list manager rece");
             for(int i = 0; i < ListaManager.size(); i++){
                 System.out.println(ListaManager.get(i)+" "+myport);
@@ -111,55 +109,51 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             for(int i = 0; i < ListaManagertemp.size(); i++){
                 System.out.println(ListaManagertemp.get(i)+" "+myport);
             }*/
-            }
-            else
-                if(parts[0].equals("leader")){
-                    int a=0;
-                    if(mapleaders.containsKey(Integer.parseInt(parts[1]))){
-                        int c=mapleaders.get(Integer.parseInt(parts[1]));
+                    break;
+                case "leader":
+                    int a = 0;
+                    if (mapleaders.containsKey(Integer.parseInt(parts[1]))) {
+                        int c = mapleaders.get(Integer.parseInt(parts[1]));
                         c++;
-                        mapleaders.put(Integer.parseInt(parts[1]),c);
+                        mapleaders.put(Integer.parseInt(parts[1]), c);
+                    } else {
+                        mapleaders.put(Integer.parseInt(parts[1]), 1);
                     }
-                    else{
-                        mapleaders.put(Integer.parseInt(parts[1]),1);
+                    int tamanho = 0;
+                    Iterator it = mapleaders.entrySet().iterator();
+                    while (it.hasNext()) {
+                        Map.Entry pair = (Map.Entry) it.next();
+                        tamanho += Integer.valueOf(pair.getValue().toString());
                     }
-                    int tamanho=0;
-                    Iterator it=mapleaders.entrySet().iterator();
-                    while(it.hasNext()){
-                        Map.Entry pair=(Map.Entry)it.next();
-                        tamanho+=Integer.valueOf(pair.getValue().toString());
-                    }
-                    if(tamanho==ListaManagertemp.size()){
-                        Iterator ite=mapleaders.entrySet().iterator();
-                        while(ite.hasNext()){
-                            Map.Entry pair=(Map.Entry)ite.next();
-                            if((float)Integer.valueOf(pair.getValue().toString())/tamanho * 100 >= 50 ){
-                                leader=Integer.parseInt(pair.getKey().toString());
+                    System.out.println("tamanho "+tamanho + " "+ListaManagertemp.size());
+                    if (tamanho >= ListaManagertemp.size()) {
+                        Iterator ite = mapleaders.entrySet().iterator();
+                        while (ite.hasNext()) {
+                            Map.Entry pair = (Map.Entry) ite.next();
+                            if ((float) Integer.valueOf(pair.getValue().toString()) / tamanho * 100 >= 50) {
+                                leader = Integer.parseInt(pair.getKey().toString());
                                 leaderdefinitivo(leader);
-                                a=1;
+                                a = 1;
                                 break;
                             }
                         }
-                        if(a==0){
-                            leader=-1;
+                        if (a == 0) {
+                            leader = -1;
                         }
-                        a=0;
+                        a = 0;
                         mapleaders.clear();
                     }
-                }
-                else if(parts[0].equals("defleader")) {
-                    leader=Integer.parseInt(parts[1]);
-                    System.out.println(myport+"Lider definitivo " + leader);
-                }
-                else if(parts[0].equals("add")){
-                    Place place=new Place(parts[2],parts[1]);
-                    if(!places.contains(place) && leader!=myport){
+                    break;
+                case "defleader":
+                    leader = Integer.parseInt(parts[1]);
+                    System.out.println(myport + "Lider definitivo " + leader);
+                    break;
+                case "add":
+                    Place place = new Place(parts[2], parts[1]);
+                    if (!places.contains(place) && leader != myport) {
                         places.add(place);
                     }
-                }
-            if("OK".equals(msg)) {
-                System.out.println("No more message. Exiting : "+msg);
-                break;
+                    break;
             }
         }
         socket.leaveGroup(group);
@@ -246,7 +240,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
-        System.out.println("New Leader = "+myport+" "+leadertemp);
+        System.out.println("New Leader = "+myport+" "+leadertemp+" "+leader);
     }
 
     public void sendleadermessage() throws UnknownHostException {
@@ -285,6 +279,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     @Override
     public void addPlace(Place p) throws RemoteException {
         places.add(p);
+        System.out.println("Place adicionado: "+p.getPostalCode()+" "+p.getLocality());
         if(leader==myport){
             try {
                 sendaddmessage(p);
