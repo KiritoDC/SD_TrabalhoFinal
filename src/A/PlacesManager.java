@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.net.*;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static java.lang.Thread.sleep;
@@ -11,8 +14,7 @@ import static java.lang.Thread.sleep;
 public class PlacesManager extends UnicastRemoteObject implements PlacesListInterface,MonitoringInterface {
 
     private static final long serialVersionUID = 1L;
-    ArrayList <Integer> ListaManager = new ArrayList<Integer>();
-    ArrayList <Integer> ListaManagertemp = new ArrayList<Integer>();
+    HashMap <Integer, Timestamp> lista =new HashMap<Integer, Timestamp>();
     ArrayList <Place> places;
     static Thread t;
     static Thread p;
@@ -39,9 +41,8 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         myport=port;
         this.places=new ArrayList <Place>();
         PlacesListInterface placesListInterface=null;
+        lista.put(myport, new Timestamp(System.currentTimeMillis()));
         String addr=null;
-        ListaManager.add(myport);
-        ListaManagertemp.add(myport);
         t= (new Thread(){
             public void run() {
                 try {
@@ -58,6 +59,8 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                 try {
                     keepalive();
                 } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ParseException e) {
                     e.printStackTrace();
                 }
             }
@@ -98,8 +101,11 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             for(int i = 0; i < ListaManagertemp.size(); i++){
                 System.out.println(ListaManagertemp.get(i)+" "+myport);
             }*/
-                    if (!ListaManagertemp.contains(porta)) {
-                        ListaManagertemp.add(porta);
+                    if(lista.containsKey(porta)){
+                        lista.put(porta, new Timestamp(System.currentTimeMillis()));
+                    }
+                    else{
+                        lista.put(porta, new Timestamp(System.currentTimeMillis()));
                     }
             /*System.out.println("list manager rece");
             for(int i = 0; i < ListaManager.size(); i++){
@@ -125,8 +131,8 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                         Map.Entry pair = (Map.Entry) it.next();
                         tamanho += Integer.valueOf(pair.getValue().toString());
                     }
-                    System.out.println("tamanho "+tamanho + " "+ListaManagertemp.size());
-                    if (tamanho >= ListaManagertemp.size()) {
+                    System.out.println("tamanho "+tamanho + " "+lista.size());
+                    if (tamanho >= lista.size()) {
                         Iterator ite = mapleaders.entrySet().iterator();
                         while (ite.hasNext()) {
                             Map.Entry pair = (Map.Entry) ite.next();
@@ -160,38 +166,32 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         socket.close();
     }
 
-    public void keepalive() throws InterruptedException {
+    public void keepalive() throws InterruptedException, ParseException {
         while(estado){
-            Collections.sort(ListaManager);
-            Collections.sort(ListaManagertemp);
-            System.out.println("list manager");
-            for(int i = 0; i < ListaManager.size(); i++){
-                System.out.println(ListaManager.get(i)+" "+myport);
-            }
-            System.out.println("lista temp");
-            for(int i = 0; i < ListaManagertemp.size(); i++){
-                System.out.println(ListaManagertemp.get(i)+" "+myport);
-            }
-            if(!ListaManager.equals(ListaManagertemp) || leader==-1) {
-                electleader();
-                ListaManager.clear();
-                for(int i=0;i<ListaManagertemp.size();i++){
-                    ListaManager.add(ListaManagertemp.get(i));
+            System.out.println("lista");
+            boolean eliminado=false;
+            Iterator it = lista.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry pair = (Map.Entry) it.next();
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
+                if(new Timestamp(System.currentTimeMillis()).getTime()-dateFormat.parse(pair.getValue().toString()).getTime()>10000){
+                    eliminado=true;
+                    //lista.remove(pair.getKey()); //CUIDADO ponteiros deve dar erro
+                    it.remove();
                 }
+                System.out.println(pair.getKey()+" "+myport);
             }
-           else if(!ListaManager.contains(leader)){
+
+            if(eliminado || leader==-1) {
                 electleader();
-                ListaManager.clear();
-                for(int i=0;i<ListaManagertemp.size();i++){
-                    ListaManager.add(ListaManagertemp.get(i));
-                }
+                eliminado=false;
+            }
+           else if(!lista.containsKey(leader)){
+                electleader();
             }
             else{
                 System.out.println("Current Leader = "+myport+" " + leader);
             }
-            ListaManagertemp.clear();
-            ListaManagertemp.add(myport);
-
             try {
                 findServers(myport);
             } catch (UnknownHostException e) {
@@ -230,10 +230,16 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     }
 
     public void electleader() {
-        leadertemp=ListaManagertemp.get(0);
-        for(int i=0;i<ListaManagertemp.size();i++){
-            if(leadertemp>=ListaManagertemp.get(i))
-                leadertemp=ListaManagertemp.get(i);
+        if(lista.size()<1)
+            leadertemp=-1;
+        else
+            leadertemp=lista.entrySet().iterator().next().getKey();
+        Iterator it = lista.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry) it.next();
+            if(leadertemp>=Integer.parseInt(pair.getKey().toString())){
+                leadertemp=Integer.parseInt(pair.getKey().toString());
+            }
         }
         try {
             sendleadermessage();
