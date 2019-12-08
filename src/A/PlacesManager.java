@@ -24,12 +24,11 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     int myport;
     int leader=-1;
     int leadertemp;
-    static int portoServerLider;
+    boolean novo=true;
     boolean estado=true;
 
     public PlacesManager() throws RemoteException {
         super();
-        //this.places=null;
         this.places=new ArrayList <Place>();
     }
 
@@ -53,7 +52,9 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             }
         });
         t.start();
-        sleep(1000);
+        //sleep(5000);
+        sendnewmessage();
+        sleep(5000);
         p= (new Thread(){
             public void run() {
                 try {
@@ -66,10 +67,23 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             }
         });
         p.start();
-        if(myport==2026) {
-            sleep(10000);
+        y= (new Thread(){
+            public void run() {
+                if(myport==2028) {
+                    try {
+                        Thread.sleep(30000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    estado=false;
+                }
+            }
+        });
+        y.start();
+      /*  if(myport==2028) {
+            sleep(30000);
             estado=false;
-        }
+        }*/
     }
 
     public void receiveUDPMessage(String ip, int port) throws
@@ -93,28 +107,12 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             switch (parts[0]) {
                 case "Info":
                     int porta = Integer.valueOf(parts[1]);
-            /*System.out.println("list manager rece antes");
-            for(int i = 0; i < ListaManager.size(); i++){
-                System.out.println(ListaManager.get(i)+" "+myport);
-            }
-            System.out.println("lista temp rec antes");
-            for(int i = 0; i < ListaManagertemp.size(); i++){
-                System.out.println(ListaManagertemp.get(i)+" "+myport);
-            }*/
                     if(lista.containsKey(porta)){
                         lista.put(porta, new Timestamp(System.currentTimeMillis()));
                     }
                     else{
                         lista.put(porta, new Timestamp(System.currentTimeMillis()));
                     }
-            /*System.out.println("list manager rece");
-            for(int i = 0; i < ListaManager.size(); i++){
-                System.out.println(ListaManager.get(i)+" "+myport);
-            }
-            System.out.println("lista temp rec");
-            for(int i = 0; i < ListaManagertemp.size(); i++){
-                System.out.println(ListaManagertemp.get(i)+" "+myport);
-            }*/
                     break;
                 case "leader":
                     int a = 0;
@@ -131,7 +129,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                         Map.Entry pair = (Map.Entry) it.next();
                         tamanho += Integer.valueOf(pair.getValue().toString());
                     }
-                    System.out.println("tamanho "+tamanho + " "+lista.size());
+                    //mudar processo de eleiçao
                     if (tamanho >= lista.size()) {
                         Iterator ite = mapleaders.entrySet().iterator();
                         while (ite.hasNext()) {
@@ -160,6 +158,16 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                         places.add(place);
                     }
                     break;
+                case "new":
+                        sendreplyleader();
+                    break;
+                case "newreply":
+                    if(novo){
+                        novo=false;
+                        //processar mensagem do leader
+                        leader=Integer.parseInt(parts[1]);
+                    }
+                    break;
             }
         }
         socket.leaveGroup(group);
@@ -175,19 +183,17 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                 Map.Entry pair = (Map.Entry) it.next();
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
                 if(new Timestamp(System.currentTimeMillis()).getTime()-dateFormat.parse(pair.getValue().toString()).getTime()>10000){
-                    eliminado=true;
-                    //lista.remove(pair.getKey()); //CUIDADO ponteiros deve dar erro
+                    if(Integer.parseInt(pair.getKey().toString())==leader)
+                        eliminado=true;
                     it.remove();
                 }
                 System.out.println(pair.getKey()+" "+myport);
             }
 
-            if(eliminado || leader==-1) {
+            if(eliminado || !lista.containsKey(leader)) {
+                System.out.println(myport+" "+leader+" "+eliminado);
                 electleader();
                 eliminado=false;
-            }
-           else if(!lista.containsKey(leader)){
-                electleader();
             }
             else{
                 System.out.println("Current Leader = "+myport+" " + leader);
@@ -231,7 +237,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
 
     public void electleader() {
         if(lista.size()<1)
-            leadertemp=-1;
+            leadertemp=myport;
         else
             leadertemp=lista.entrySet().iterator().next().getKey();
         Iterator it = lista.entrySet().iterator();
@@ -263,11 +269,44 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
         }
     }
 
+    public void sendnewmessage() throws UnknownHostException {
+        //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
+        /*if(lista.isEmpty()){
+            leader=myport;
+        }
+        else {*/
+            InetAddress addr = InetAddress.getByName(INET_ADDR);
+            try (DatagramSocket serverSocket = new DatagramSocket()) {
+                String msg = "new ".concat(String.valueOf(myport));
+                DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
+                serverSocket.send(msgPacket);
+            } catch (SocketException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+      //  }
+    }
+
     public void sendaddmessage(Place p) throws UnknownHostException {
         //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
         InetAddress addr = InetAddress.getByName(INET_ADDR);
         try (DatagramSocket serverSocket = new DatagramSocket()){
             String msg = "add ".concat(p.getLocality()).concat(" ").concat(p.getPostalCode());
+            DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
+            serverSocket.send(msgPacket);
+        } catch (SocketException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void sendreplyleader() throws UnknownHostException {
+        //Envio de uma mensagem multicast aos outros servidores de modo a verificar quais os portos ainda ativos
+        InetAddress addr = InetAddress.getByName(INET_ADDR);
+        try (DatagramSocket serverSocket = new DatagramSocket()){
+            String msg = "newreply "+leader;
             DatagramPacket msgPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, addr, PORT);
             serverSocket.send(msgPacket);
         } catch (SocketException e) {
