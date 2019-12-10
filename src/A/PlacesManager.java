@@ -188,7 +188,14 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                                 //System.out.println(myport + " " + parts[i]);
                                 String[] parts1 = parts[i].split("/");
                                 Place p = new Place(parts1[0], parts1[1]);
-                                if (!places.contains(p)) {
+                                boolean ab=false;
+                                for(int h=0;h<places.size();h++){
+                                    if(places.get(h).getPostalCode().equals(parts1[0]) && places.get(h).getLocality().equals(parts1[1]))
+                                        ab=true;
+                                }
+                               // if (!places.contains(p)) {
+                                if(!ab){
+                                    ab=false;
                                     places.add(p);
                                     //System.out.println("-"+p.getPostalCode() + "- -" + p.getLocality()+"-");
                                 }
