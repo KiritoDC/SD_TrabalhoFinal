@@ -114,7 +114,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                         //processar as informaçoes do lider e da eleiçao
                         leader = Integer.parseInt(parts[2]);
                         neleicao = Integer.parseInt(parts[3]);
-                        if(leader!=-1) { //se existir um lider na rede pede lhe a lista de places por rmi
+                        if(leader!=-1 && leader!=myport) { //se existir um lider na rede pede lhe a lista de places por rmi
                             String endereco = "rmi://localhost:" + leader + "/placelist";
                             try {
                                 plm = (PlacesListInterface) Naming.lookup(endereco);
