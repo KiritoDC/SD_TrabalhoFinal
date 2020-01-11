@@ -119,7 +119,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
                             try {
                                 plm = (PlacesListInterface) Naming.lookup(endereco);
                                 places = plm.allPlaces(); //adiçao aos logs
-                                appendlog.put(places.size(),"allPlaces()");
+                                //appendlog.put(places.size(),"allPlaces()");
                             } catch (NotBoundException e) {
                                 e.printStackTrace();
                             }
@@ -218,7 +218,7 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
             while (it.hasNext()) { //verificação se algum porto esta inativo, se não enviou nenhum heartbeat para este servidor durante 2 iterações
                 Map.Entry pair = (Map.Entry) it.next();
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
-                if(new Timestamp(System.currentTimeMillis()).getTime()-dateFormat.parse(pair.getValue().toString()).getTime()>10000){
+                if(new Timestamp(System.currentTimeMillis()).getTime()-dateFormat.parse(pair.getValue().toString()).getTime()>10000 && Integer.parseInt(pair.getKey().toString())!=myport){
                     if(Integer.parseInt(pair.getKey().toString())==leader)
                         eliminado=true;
                     it.remove();
@@ -268,9 +268,11 @@ public class PlacesManager extends UnicastRemoteObject implements PlacesListInte
     }
 
     public void electleader() { //funçao de eleição do candidato
-        if(lista.size()<1) { //auto-eleiçao caso não exista mais ninguem presente na rede
+        if(lista.size()<=1) { //auto-eleiçao caso não exista mais ninguem presente na rede
             leadertemp = myport;
+            leader=myport;
             neleicao=1;
+            return;
         }
         else
             leadertemp=lista.entrySet().iterator().next().getKey();
